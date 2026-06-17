@@ -36,6 +36,8 @@ type userState struct {
 	triageRecipients []Recipient
 	triageSeed       string // system prompt prepended to the first turn, then cleared
 	triageSession    bool   // this session IS the persistent triage brain (interact triage)
+
+	teamSession bool // mid multi-turn zc-team conversation: route messages to team.sock
 }
 
 // RunDaemon resolves the allow-list, greets each member, then services incoming
@@ -52,6 +54,13 @@ func (d *comp) handle(st *userState, text string) {
 	// agent session), so handle them before the busy gate.
 	if lower == "errand" || lower == "errands" || strings.HasPrefix(lower, "errand ") {
 		d.handleErrandCommand(st, strings.TrimSpace(text))
+		return
+	}
+
+	// zc-team commands (and any ongoing multi-turn team conversation) are
+	// forwarded to the team component, which holds the conversation state.
+	if st.teamSession || isTeamCommand(lower) {
+		d.handleTeamCommand(st, strings.TrimSpace(text))
 		return
 	}
 

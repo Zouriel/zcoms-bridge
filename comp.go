@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -96,6 +97,69 @@ func (d *comp) errandCommand(text string) string {
 // handleErrandCommand relays an `errand …` bridge command to the errands component.
 func (d *comp) handleErrandCommand(st *userState, text string) {
 	d.send(st.chatID, d.errandCommand(text))
+}
+
+// isTeamCommand reports whether a message should be routed to the zc-team
+// component (lowercased text).
+func isTeamCommand(lower string) bool {
+	switch lower {
+	case "add task", "add tasks", "new task", "finish task", "team":
+		return true
+	}
+	for _, p := range []string{"team ", "delegator ", "standup ", "staff ", "task ", "agent create "} {
+		if strings.HasPrefix(lower, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// handleTeamCommand forwards a message to the team component over team.sock and
+// relays the reply, staying in a "team session" while the component asks for more
+// (multi-turn flows like add/new/finish task).
+func (d *comp) handleTeamCommand(st *userState, text string) {
+	dir, err := agent.DefaultAppDir()
+	if err != nil {
+		d.send(st.chatID, "⚠️ "+err.Error())
+		return
+	}
+	conn, err := net.DialTimeout("unix", filepath.Join(dir, "team.sock"), 2*time.Second)
+	if err != nil {
+		d.setTeamSession(st, false)
+		d.send(st.chatID, "The team component isn't running — install it with `zc install team`.")
+		return
+	}
+	defer conn.Close()
+	req, _ := json.Marshal(struct {
+		Text  string `json:"text"`
+		Actor string `json:"actor"`
+	}{text, st.username})
+	_, _ = conn.Write(append(req, '\n'))
+	_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	line, _ := bufio.NewReader(conn).ReadBytes('\n')
+	var resp struct {
+		OK       bool   `json:"ok"`
+		Reply    string `json:"reply"`
+		Continue bool   `json:"continue"`
+		Error    string `json:"error"`
+	}
+	if json.Unmarshal(line, &resp) != nil {
+		d.setTeamSession(st, false)
+		d.send(st.chatID, "⚠️ couldn't reach the team component")
+		return
+	}
+	d.setTeamSession(st, resp.Continue)
+	if !resp.OK {
+		d.send(st.chatID, "⚠️ "+resp.Error)
+		return
+	}
+	d.send(st.chatID, resp.Reply)
+}
+
+func (d *comp) setTeamSession(st *userState, on bool) {
+	d.mu.Lock()
+	st.teamSession = on
+	d.mu.Unlock()
 }
 
 // triage-session.json helpers (the bridge resumes/resets the shared triage brain
