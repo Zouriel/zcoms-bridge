@@ -35,6 +35,7 @@ func main() {
 		waSocket:      settings.WhatsApp.Socket,
 		waEnabled:     settings.WhatsApp.Enabled,
 		bridgeBackend: agents.For("bridge", ""),
+		chatBackend:   agents.For("chat", ""),
 		triageBackend: agents.For("triage", ""),
 		locations:     locations,
 		allow:         allow,

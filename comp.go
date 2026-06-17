@@ -22,6 +22,7 @@ type comp struct {
 	waSocket      string
 	waEnabled     bool
 	bridgeBackend Backend
+	chatBackend   Backend
 	triageBackend Backend
 	locations     Locations
 	allow         Allowlist

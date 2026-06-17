@@ -267,8 +267,8 @@ func (d *comp) selectNumber(st *userState, n int) {
 }
 
 // startChat puts the user in a full-power, general-purpose agent session: their
-// allow-listed role (full for the owner) in their home directory, on the bridge
-// session-type agent (`zc agents set bridge`). Unlike `interact triage`, it is a normal agent
+// allow-listed role (full for the owner) in their home directory, on the chat
+// session-type agent (`zc agents set chat`). Unlike `interact triage`, it is a normal agent
 // session with no directive protocol — it can create/edit files, run commands,
 // SSH into servers, etc. A context seed (first turn) tells it the owner's
 // Telegram/WhatsApp are already wired through this tool. Resumes until `new`/`end`.
@@ -281,7 +281,7 @@ func (d *comp) startChat(st *userState) {
 	st.location, st.locationPath, st.effectiveRole = "chat", home, st.entry.Role
 	st.sessionID, st.pendingKind, st.awaitingConfirm = "", "", false
 	st.triageReply, st.triageSession, st.triageRecipients = false, false, nil
-	st.forceBackend = d.bridgeBackend // chat is a bridge session — use the bridge agent
+	st.forceBackend = d.chatBackend // explicit chat can use a different backend than location sessions
 	st.triageSeed = buildChatSeed()
 	role := st.effectiveRole
 	d.mu.Unlock()
