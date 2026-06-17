@@ -1,0 +1,13 @@
+[Unit]
+Description=zcoms bridge component
+After=network-online.target zcoms-daemon.service
+Wants=zcoms-daemon.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/zcoms-bridge
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
