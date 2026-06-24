@@ -163,6 +163,55 @@ func (d *comp) setTeamSession(st *userState, on bool) {
 	d.mu.Unlock()
 }
 
+// isCommerceCommand reports whether a message should be routed to the
+// zc-commerce component (lowercased text).
+func isCommerceCommand(lower string) bool {
+	return lower == "commerce" || strings.HasPrefix(lower, "commerce ")
+}
+
+// handleCommerceCommand forwards a `commerce …` message to the commerce
+// component over commerce.sock and relays the reply. Unlike team, commerce is
+// stateless — one request, one response.
+func (d *comp) handleCommerceCommand(st *userState, text string) {
+	// Strip the leading "commerce" so the component sees its own subcommand
+	// (e.g. "commerce store list" -> "store list"), matching the CLI which
+	// passes only the args after `zc commerce`.
+	sub := strings.TrimSpace(strings.TrimPrefix(text, "commerce"))
+
+	dir, err := agent.DefaultAppDir()
+	if err != nil {
+		d.send(st.chatID, "⚠️ "+err.Error())
+		return
+	}
+	conn, err := net.DialTimeout("unix", filepath.Join(dir, "commerce.sock"), 2*time.Second)
+	if err != nil {
+		d.send(st.chatID, "The commerce component isn't running — install it with `zc install commerce`.")
+		return
+	}
+	defer conn.Close()
+	req, _ := json.Marshal(struct {
+		Text  string `json:"text"`
+		Actor string `json:"actor"`
+	}{sub, st.username})
+	_, _ = conn.Write(append(req, '\n'))
+	_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	line, _ := bufio.NewReader(conn).ReadBytes('\n')
+	var resp struct {
+		OK    bool   `json:"ok"`
+		Reply string `json:"reply"`
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(line, &resp) != nil {
+		d.send(st.chatID, "⚠️ couldn't reach the commerce component")
+		return
+	}
+	if !resp.OK {
+		d.send(st.chatID, "⚠️ "+resp.Error)
+		return
+	}
+	d.send(st.chatID, resp.Reply)
+}
+
 // triage-session.json helpers (the bridge resumes/resets the shared triage brain
 // the same way the daemon and triage component do).
 type triageSession struct {

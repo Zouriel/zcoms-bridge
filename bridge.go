@@ -64,6 +64,13 @@ func (d *comp) handle(st *userState, text string) {
 		return
 	}
 
+	// zc-commerce commands are forwarded to the commerce component, which drives
+	// the hosted runtime over REST. Stateless (no multi-turn session).
+	if isCommerceCommand(lower) {
+		d.handleCommerceCommand(st, strings.TrimSpace(text))
+		return
+	}
+
 	d.mu.Lock()
 	busy := st.busy
 	d.mu.Unlock()
@@ -317,6 +324,23 @@ func buildChatSeed() string {
 		"precisely — it's the only instruction the producer is allowed to act on. Manage with",
 		"`zc errand list` / `zc errand cancel <id>`. Prefer this for any \"go talk to X and come back with Y\"",
 		"task — don't try to hold the back-and-forth yourself.",
+		"SCHEDULING — when the owner wants an errand dispatched at a LATER time (\"tomorrow at 9\", \"in two",
+		"hours\", \"on Friday afternoon\"), schedule it instead of waiting around or doing it now:",
+		"  `zc errand schedule [deliver] [go] <@user|wa:NUMBER|#index> <when> | <brief>`",
+		"    <when> = a relative duration (+30m, +2h, 1h30m), a wall-clock time today/tomorrow (15:30),",
+		"    or a full local timestamp (2026-06-18T15:30). At that time it fires exactly like `errand start`",
+		"    (drafts a plan for the owner's approval by default, or starts immediately with `go`). The target",
+		"    is resolved when it fires, and a schedule survives a restart. Manage with `zc errand scheduled`",
+		"    (list what's queued) / `zc errand unschedule <id>`. Use this rather than sleeping or telling the",
+		"    owner you'll \"remember\" — once scheduled it runs on its own.",
+		"",
+		"COMMERCE — the owner runs zc-commerce, a hosted Telegram-Stars commerce platform: merchants bring",
+		"a bot token and zcoms hosts it on a VPS runtime (merchant bots, Stars payments, delivery,",
+		"subscriptions, refunds, per-store billing). Inspect and drive it with the `zc commerce` CLI:",
+		"  • `zc commerce status` (runtime link) · `zc commerce store list` · `zc commerce store show <id>`",
+		"  • `zc commerce product list <store_id>` · `zc commerce order list <store_id>` · `zc commerce order show <id>`",
+		"  • `zc commerce refund list [store_id]` · `zc commerce billing history <store_id>` · `zc commerce report platform`",
+		"When the owner asks about stores, products, orders, refunds, or store billing, use `zc commerce`.",
 		"For anything else, you have a normal shell — create/edit files, run commands, SSH, etc.",
 	}, "\n")
 }
@@ -514,6 +538,7 @@ func (d *comp) helpText(st *userState) string {
 		"  interact triage — talk to the triage agent (same memory) & reply to people",
 		"  chat — full general-purpose assistant (files, shell, SSH) in your home dir",
 		"  triage reset — wipe the triage agent's memory (fresh session next pass)",
+		"  commerce — Zcoms Commerce control plane (status · store · product · order · refund · billing · report)",
 		"Anything else you type is sent to the agent.",
 		"",
 		"Your role: " + string(st.entry.Role),
