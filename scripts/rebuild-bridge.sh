@@ -8,7 +8,7 @@
 # broken build never replaces a working bridge.
 set -euo pipefail
 
-REPO_DIR="${REPO_DIR:-$HOME/personal/zcoms-bridge}"
+REPO_DIR="${REPO_DIR:-$HOME/personal/Zcoms/zcoms-bridge}"
 BIN="${BIN:-$HOME/.local/bin/zcoms-bridge}"
 UNIT="zcoms-bridge.service"
 
